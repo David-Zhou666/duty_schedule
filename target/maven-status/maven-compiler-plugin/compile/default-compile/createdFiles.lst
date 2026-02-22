@@ -1,4 +1,5 @@
 com\schedule\model\Holiday.class
+com\schedule\controller\HomeController.class
 com\schedule\service\ScheduleService.class
 com\schedule\model\DutySchedule.class
 com\schedule\model\Person.class
