@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>值日排班系统</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 30px;
+        }
+
+        .upload-section {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+        }
+
+        .upload-section h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            color: #555;
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        .form-group input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            border: 2px dashed #ccc;
+            border-radius: 5px;
+            background: white;
+            cursor: pointer;
+        }
+
+        .form-group input[type="date"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 20px;
+        }
+
+        .form-row .form-group {
+            flex: 1;
+        }
+
+        .btn-upload {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+            transition: transform 0.2s;
+        }
+
+        .btn-upload:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-download {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            border-radius: 5px;
+            font-size: 14px;
+            cursor: pointer;
+            margin-top: 15px;
+        }
+
+        .btn-download:hover {
+            background: #218838;
+        }
+
+        .result-section {
+            display: none;
+            margin-top: 25px;
+        }
+
+        .result-section.show {
+            display: block;
+        }
+
+        .result-section h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 20px;
+        }
+
+        .info-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .info-card {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .info-card h3 {
+            font-size: 28px;
+            margin-bottom: 5px;
+        }
+
+        .info-card p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .schedule-table-container {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .schedule-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .schedule-table th,
+        .schedule-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .schedule-table th {
+            background: #f8f9fa;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .schedule-table tr:hover {
+            background: #f5f5f5;
+        }
+
+        .holiday-row {
+            background: #fff3cd !important;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+
+        .success {
+            background: #d4edda;
+            color: #155724;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+
+        .template-hint {
+            background: #e7f3ff;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin-top: 15px;
+            font-size: 14px;
+            color: #333;
+        }
+
+        .template-hint h3 {
+            margin-bottom: 10px;
+            color: #2196F3;
+        }
+
+        .template-hint code {
+            background: #f5f5f5;
+            padding: 2px 5px;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📅 值日排班系统</h1>
+            <p>支持多Sheet Excel上传 · 智能排班 · 节假日自动调整</p>
+        </div>
+
+        <div class="content">
+            <div class="upload-section">
+                <h2>上传人员Excel文件</h2>
+
+                <div id="message"></div>
+
+                <form id="uploadForm">
+                    <div class="form-group">
+                        <label>选择Excel文件 (.xlsx)</label>
+                        <input type="file" id="file" name="file" accept=".xlsx" required>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>开始日期</label>
+                            <input type="date" id="startDate" name="startDate">
+                        </div>
+                        <div class="form-group">
+                            <label>结束日期</label>
+                            <input type="date" id="endDate" name="endDate">
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-upload">生成排班表</button>
+                </form>
+
+                <div class="template-hint">
+                    <h3>Excel 格式说明</h3>
+                    <p>第一列：姓名 | 第二列：性别（男/女）| 第三列：是否纪检委员（是/否）</p>
+                    <p>支持多个Sheet页，所有Sheet页都会被解析</p>
+                    <p>示例：<code>张三  男  是</code></p>
+                </div>
+            </div>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>正在生成排班表，请稍候...</p>
+            </div>
+
+            <div class="result-section" id="resultSection">
+                <h2>排班结果</h2>
+
+                <div class="info-cards">
+                    <div class="info-card">
+                        <h3 id="personCount">0</h3>
+                        <p>总人数</p>
+                    </div>
+                    <div class="info-card">
+                        <h3 id="scheduleCount">0</h3>
+                        <p>排班天数</p>
+                    </div>
+                </div>
+
+                <div class="schedule-table-container">
+                    <pre id="scheduleTable" style="white-space: pre-wrap; padding: 20px; font-family: 'Courier New', monospace; line-height: 1.6;"></pre>
+                </div>
+
+                <button class="btn-download" onclick="downloadSchedule()">下载排班表</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 设置默认日期为本月
+        const now = new Date();
+        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+        const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+        document.getElementById('startDate').value = firstDay.toISOString().split('T')[0];
+        document.getElementById('endDate').value = lastDay.toISOString().split('T')[0];
+
+        // 表单提交
+        document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const fileInput = document.getElementById('file');
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
+
+            if (fileInput.files.length === 0) {
+                showMessage('请选择Excel文件', 'error');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            if (startDate) formData.append('startDate', startDate);
+            if (endDate) formData.append('endDate', endDate);
+
+            // 显示加载中
+            document.getElementById('loading').classList.add('show');
+            document.getElementById('resultSection').classList.remove('show');
+            document.getElementById('message').innerHTML = '';
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                document.getElementById('loading').classList.remove('show');
+
+                if (result.success) {
+                    showMessage(result.message, 'success');
+                    document.getElementById('personCount').textContent = result.personCount;
+                    document.getElementById('scheduleCount').textContent = result.scheduleCount;
+                    document.getElementById('scheduleTable').textContent = result.scheduleTable;
+                    document.getElementById('resultSection').classList.add('show');
+                } else {
+                    showMessage(result.message, 'error');
+                }
+            } catch (error) {
+                document.getElementById('loading').classList.remove('show');
+                showMessage('上传失败：' + error.message, 'error');
+            }
+        });
+
+        function showMessage(message, type) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.innerHTML = `<div class="${type}">${message}</div>`;
+        }
+
+        function downloadSchedule() {
+            const scheduleText = document.getElementById('scheduleTable').textContent;
+            const blob = new Blob([scheduleText], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = '排班表_' + new Date().toISOString().split('T')[0] + '.txt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,38 @@
+[INFO] Scanning for projects...
+[INFO] 
+[INFO] --------------------< com.schedule:duty-scheduler >---------------------
+[INFO] Building Duty Scheduler 1.0.0
+[INFO]   from pom.xml
+[INFO] --------------------------------[ war ]---------------------------------
+[INFO] 
+[INFO] --- clean:3.2.0:clean (default-clean) @ duty-scheduler ---
+[INFO] Deleting C:\Users\Asus\CodeBuddy\20260221191406\target
+[INFO] 
+[INFO] --- resources:3.3.1:resources (default-resources) @ duty-scheduler ---
+[INFO] Copying 1 resource from src\main\resources to target\classes
+[INFO] 
+[INFO] --- compiler:3.10.1:compile (default-compile) @ duty-scheduler ---
+[INFO] Changes detected - recompiling the module!
+[INFO] Compiling 6 source files to C:\Users\Asus\CodeBuddy\20260221191406\target\classes
+[INFO] 
+[INFO] --- resources:3.3.1:testResources (default-testResources) @ duty-scheduler ---
+[INFO] skip non existing resourceDirectory C:\Users\Asus\CodeBuddy\20260221191406\src\test\resources
+[INFO] 
+[INFO] --- compiler:3.10.1:testCompile (default-testCompile) @ duty-scheduler ---
+[INFO] No sources to compile
+[INFO] 
+[INFO] --- surefire:3.2.5:test (default-test) @ duty-scheduler ---
+[INFO] Tests are skipped.
+[INFO] 
+[INFO] --- war:3.3.2:war (default-war) @ duty-scheduler ---
+[INFO] Packaging webapp
+[INFO] Assembling webapp [duty-scheduler] in [C:\Users\Asus\CodeBuddy\20260221191406\target\duty-scheduler]
+[INFO] Processing war project
+[INFO] Copying webapp resources [C:\Users\Asus\CodeBuddy\20260221191406\src\main\webapp]
+[INFO] Building war: C:\Users\Asus\CodeBuddy\20260221191406\target\duty-scheduler.war
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] ------------------------------------------------------------------------
+[INFO] Total time:  4.791 s
+[INFO] Finished at: 2026-02-21T22:11:47+08:00
+[INFO] ------------------------------------------------------------------------
