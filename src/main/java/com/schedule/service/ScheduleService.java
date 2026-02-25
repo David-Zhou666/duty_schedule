@@ -12,6 +12,13 @@ import java.time.LocalDate;
 import java.time.temporal.TemporalAdjusters;
 import java.util.*;
 import java.util.stream.Collectors;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 
 /**
  * 排班服务
@@ -21,6 +28,8 @@ public class ScheduleService {
     private static final Logger logger = LoggerFactory.getLogger(ScheduleService.class);
     private static final int MALE_PER_DAY = 4;
     private static final int FEMALE_PER_DAY = 2;
+    private static final int WEEKLY_LIMIT = 5; // 每人每周上班次数上限（改为5）
+    private static final int MONTHLY_LIMIT = 20; // 每人每月上限（大数以避免过早限制）
 
     /**
      * 为指定日期范围生成排班表
@@ -69,8 +78,8 @@ public class ScheduleService {
                 ));
             } else if (currentDate.getDayOfWeek().getValue() <= 5) {
                 // 周一到周五正常排班
-                List<Person> maleDuty = selectPersons(maleInspectors, maleNormal, MALE_PER_DAY);
-                List<Person> femaleDuty = selectPersons(femaleInspectors, femaleNormal, FEMALE_PER_DAY);
+                List<Person> maleDuty = selectPersons(maleInspectors, maleNormal, MALE_PER_DAY, currentDate.getDayOfWeek().getValue());
+                List<Person> femaleDuty = selectPersons(femaleInspectors, femaleNormal, FEMALE_PER_DAY, currentDate.getDayOfWeek().getValue());
 
                 DutySchedule schedule = new DutySchedule(
                         java.sql.Date.valueOf(currentDate),
@@ -101,28 +110,41 @@ public class ScheduleService {
      * 选择值班人员
      * 规则：优先排纪检委员，每人一周不超过2次，一个月不超过4次
      */
-    private List<Person> selectPersons(List<Person> inspectors, List<Person> normal, int count) {
+    private List<Person> selectPersons(List<Person> inspectors, List<Person> normal, int count, int dayOfWeekValue) {
         List<Person> selected = new ArrayList<>();
         List<Person> all = new ArrayList<>();
 
+        // 过滤出当天可用的人员（dayOfWeekValue: 1=Mon .. 7=Sun）
+        int weekdayIndex = dayOfWeekValue; // 1..7
+        List<Person> availInspectors = new ArrayList<>();
+        for (Person p : inspectors) {
+            if (weekdayIndex >= 1 && weekdayIndex <= 5) {
+                if (p.isAvailableOn(weekdayIndex)) availInspectors.add(p);
+            }
+        }
+        List<Person> availNormal = new ArrayList<>();
+        for (Person p : normal) {
+            if (weekdayIndex >= 1 && weekdayIndex <= 5) {
+                if (p.isAvailableOn(weekdayIndex)) availNormal.add(p);
+            }
+        }
+
         // 优先选择纪检委员（按已排班次数升序排序）
-        inspectors.sort(Comparator.comparingInt(Person::getWeeklyCount)
-                .thenComparingInt(Person::getMonthlyCount)
-                .reversed());
-        all.addAll(inspectors);
+        availInspectors.sort(Comparator.comparingInt(Person::getWeeklyCount)
+                .thenComparingInt(Person::getMonthlyCount));
+        all.addAll(availInspectors);
 
         // 添加普通人员
-        normal.sort(Comparator.comparingInt(Person::getWeeklyCount)
-                .thenComparingInt(Person::getMonthlyCount)
-                .reversed());
-        all.addAll(normal);
+        availNormal.sort(Comparator.comparingInt(Person::getWeeklyCount)
+                .thenComparingInt(Person::getMonthlyCount));
+        all.addAll(availNormal);
 
         // 选择符合条件的人员
         for (Person person : all) {
             if (selected.size() >= count) break;
 
             // 检查约束条件
-            if (person.getWeeklyCount() < 2 && person.getMonthlyCount() < 4) {
+            if (person.getWeeklyCount() < WEEKLY_LIMIT && person.getMonthlyCount() < MONTHLY_LIMIT) {
                 selected.add(person);
                 person.incrementWeekly();
                 person.incrementMonthly();
@@ -196,7 +218,7 @@ public class ScheduleService {
         sb.append("1. 周一至周五正常排班，节假日不排班\n");
         sb.append("2. 每天男生4人，女生2人\n");
         sb.append("3. 优先安排纪检委员\n");
-        sb.append("4. 每人一周不超过2次，一个月不超过4次\n");
+        sb.append("4. 每人一周上班次数上限为5次\n");
 
         return sb.toString();
     }
@@ -254,5 +276,158 @@ public class ScheduleService {
         holidays.add(LocalDate.of(2026, 10, 8));
 
         return holidays;
+    }
+
+    /**
+     * 生成一周的排班表（周一到周五）
+     * 用于简单排班场景
+     */
+    public List<DutySchedule> generateWeeklySchedule(List<Person> persons) {
+        logger.info("开始生成一周排班表");
+        
+        List<DutySchedule> schedules = new ArrayList<>();
+        String[] dayNames = {"周一", "周二", "周三", "周四", "周五"};
+        
+        // 按性别分组
+        Map<Boolean, List<Person>> maleGroups = persons.stream()
+                .filter(p -> "男".equals(p.getGender()))
+                .collect(Collectors.groupingBy(Person::isInspector));
+
+        Map<Boolean, List<Person>> femaleGroups = persons.stream()
+                .filter(p -> "女".equals(p.getGender()))
+                .collect(Collectors.groupingBy(Person::isInspector));
+
+        List<Person> maleInspectors = maleGroups.getOrDefault(true, new ArrayList<>());
+        List<Person> maleNormal = maleGroups.getOrDefault(false, new ArrayList<>());
+        List<Person> femaleInspectors = femaleGroups.getOrDefault(true, new ArrayList<>());
+        List<Person> femaleNormal = femaleGroups.getOrDefault(false, new ArrayList<>());
+
+        logger.info("人员统计 - 男生: {}, 女生: {}", 
+                maleNormal.size() + maleInspectors.size(),
+                femaleNormal.size() + femaleInspectors.size());
+
+        // 生成周一到周五的排班
+        for (int dayIdx = 0; dayIdx < 5; dayIdx++) {
+            List<Person> maleDuty = selectPersons(maleInspectors, maleNormal, MALE_PER_DAY, dayIdx);
+            List<Person> femaleDuty = selectPersons(femaleInspectors, femaleNormal, FEMALE_PER_DAY, dayIdx);
+
+            DutySchedule schedule = new DutySchedule(
+                    java.sql.Date.valueOf(LocalDate.now().with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)).plusDays(dayIdx)),
+                    false,
+                    maleDuty,
+                    femaleDuty
+            );
+            schedules.add(schedule);
+
+            logger.info("{}: 男生={}, 女生={}", dayNames[dayIdx],
+                    maleDuty.stream().map(Person::getName).collect(Collectors.joining(",")),
+                    femaleDuty.stream().map(Person::getName).collect(Collectors.joining(",")));
+        }
+
+        logger.info("一周排班生成完成");
+        return schedules;
+    }
+
+    /**
+     * 将排班结果导出为Excel工作簿（格式：每周一行，每列显示具体学生姓名）
+     * 列格式：周次 | 男1 | 男2 | 男3 | 男4 | 女1 | 女2
+     */
+    public byte[] createWeeklyScheduleWorkbook(List<DutySchedule> schedules) throws IOException {
+        try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("排班表");
+
+            // Header: 周次 | 男1 | 男2 | 男3 | 男4 | 女1 | 女2
+            int rowIdx = 0;
+            Row header = sheet.createRow(rowIdx++);
+            header.createCell(0).setCellValue("周次");
+            header.createCell(1).setCellValue("男1");
+            header.createCell(2).setCellValue("男2");
+            header.createCell(3).setCellValue("男3");
+            header.createCell(4).setCellValue("男4");
+            header.createCell(5).setCellValue("女1");
+            header.createCell(6).setCellValue("女2");
+
+            String[] dayLabels = {"周一", "周二", "周三", "周四", "周五"};
+
+            for (int i = 0; i < schedules.size(); i++) {
+                DutySchedule s = schedules.get(i);
+                Row r = sheet.createRow(rowIdx++);
+                r.createCell(0).setCellValue(dayLabels[i]);
+
+                // 填充男生姓名（4列）
+                List<Person> males = s.getMaleDuty();
+                for (int j = 0; j < 4; j++) {
+                    String name = (j < males.size() && males.get(j) != null) ? males.get(j).getName() : "";
+                    r.createCell(1 + j).setCellValue(name);
+                }
+
+                // 填充女生姓名（2列）
+                List<Person> females = s.getFemaleDuty();
+                for (int j = 0; j < 2; j++) {
+                    String name = (j < females.size() && females.get(j) != null) ? females.get(j).getName() : "";
+                    r.createCell(5 + j).setCellValue(name);
+                }
+            }
+
+            // 自动调整列宽
+            sheet.setColumnWidth(0, 12 * 256);
+            for (int i = 1; i <= 6; i++) {
+                sheet.setColumnWidth(i, 15 * 256);
+            }
+
+            workbook.write(out);
+            return out.toByteArray();
+        }
+    }
+
+    /**
+     * 将排班表写入一个 Excel 工作簿，并返回字节数组
+     */
+    public byte[] createScheduleWorkbook(List<DutySchedule> schedules) throws IOException {
+        try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+            Sheet sheet = workbook.createSheet("排班表");
+
+            // Header: 日期 | 是否节假日 | 男1 | 男2 | 男3 | 男4 | 女1 | 女2
+            int rowIdx = 0;
+            Row header = sheet.createRow(rowIdx++);
+            header.createCell(0).setCellValue("日期");
+            header.createCell(1).setCellValue("是否节假日");
+            header.createCell(2).setCellValue("男1");
+            header.createCell(3).setCellValue("男2");
+            header.createCell(4).setCellValue("男3");
+            header.createCell(5).setCellValue("男4");
+            header.createCell(6).setCellValue("女1");
+            header.createCell(7).setCellValue("女2");
+
+            for (DutySchedule s : schedules) {
+                Row r = sheet.createRow(rowIdx++);
+                r.createCell(0).setCellValue(s.getDate().toString());
+                r.createCell(1).setCellValue(s.isHoliday() ? "是" : "否");
+
+                if (s.isHoliday()) {
+                    for (int c = 2; c <= 7; c++) r.createCell(c).setCellValue("-");
+                } else {
+                    // 填充男生 4 列
+                    List<Person> males = s.getMaleDuty();
+                    for (int i = 0; i < 4; i++) {
+                        String name = (i < males.size() && males.get(i) != null) ? males.get(i).getName() : "";
+                        r.createCell(2 + i).setCellValue(name);
+                    }
+
+                    // 填充女生 2 列
+                    List<Person> females = s.getFemaleDuty();
+                    for (int i = 0; i < 2; i++) {
+                        String name = (i < females.size() && females.get(i) != null) ? females.get(i).getName() : "";
+                        r.createCell(6 + i).setCellValue(name);
+                    }
+                }
+            }
+
+            // 自动调整列宽
+            for (int i = 0; i <= 7; i++) sheet.autoSizeColumn(i);
+
+            workbook.write(out);
+            return out.toByteArray();
+        }
     }
 }

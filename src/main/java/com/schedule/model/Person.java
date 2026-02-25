@@ -9,6 +9,7 @@ public class Person {
     private boolean isInspector;   // 是否纪检委员
     private int monthlyCount;      // 本月已排班次数
     private int weeklyCount;       // 本周已排班次数
+    private boolean[] availability = new boolean[5]; // 周一到周五可用性
 
     public Person() {
     }
@@ -19,6 +20,21 @@ public class Person {
         this.isInspector = isInspector;
         this.monthlyCount = 0;
         this.weeklyCount = 0;
+        for (int i = 0; i < availability.length; i++) this.availability[i] = true; // 默认可用
+    }
+
+    public boolean[] getAvailability() {
+        return availability;
+    }
+
+    public void setAvailability(boolean[] availability) {
+        if (availability != null && availability.length == 5) this.availability = availability;
+    }
+
+    public boolean isAvailableOn(int dayIndex) {
+        // dayIndex: 1=Monday .. 5=Friday
+        if (dayIndex < 1 || dayIndex > 5) return false;
+        return availability[dayIndex - 1];
     }
 
     public String getName() {

@@ -9,6 +9,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.ModelAndView;
 
@@ -129,5 +133,47 @@ public class ScheduleController {
     @ResponseBody
     public Set<LocalDate> getHolidays() {
         return scheduleService.generateHolidays2026();
+    }
+
+    /**
+     * 上传并直接导出排班表为 Excel 文件
+     */
+    @PostMapping(value = "/export", produces = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    public ResponseEntity<byte[]> exportScheduleExcel(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "startDate", required = false) String startDate,
+            @RequestParam(value = "endDate", required = false) String endDate) {
+
+        try {
+            if (file.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
+            }
+
+            List<Person> persons = excelParserService.parseExcelFile(file);
+            if (persons.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
+            }
+
+            LocalDate start = startDate != null && !startDate.isEmpty() ?
+                    LocalDate.parse(startDate) : LocalDate.now().withDayOfMonth(1);
+            LocalDate end = endDate != null && !endDate.isEmpty() ?
+                    LocalDate.parse(endDate) : start.withDayOfMonth(start.lengthOfMonth());
+
+            Set<LocalDate> holidaySet = scheduleService.generateHolidays2026();
+            List<com.schedule.model.DutySchedule> schedules = scheduleService.generateSchedule(persons, start, end, holidaySet);
+
+            byte[] excelBytes = scheduleService.createScheduleWorkbook(schedules);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+            headers.set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"duty_schedule.xlsx\"");
+            headers.setContentLength(excelBytes.length);
+
+            return new ResponseEntity<>(excelBytes, headers, HttpStatus.OK);
+
+        } catch (IOException e) {
+            logger.error("导出失败", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
     }
 }

@@ -28,7 +28,10 @@
         <property name="suffix" value=".html"/>
     </bean>
 
-    <!-- Multipart resolver -->
-    <bean id="multipartResolver" class="org.springframework.web.multipart.support.StandardServletMultipartResolver"/>
+    <!-- Multipart resolver: 使用 Commons FileUpload，避免依赖 Servlet multipart-config -->
+    <bean id="multipartResolver" class="org.springframework.web.multipart.commons.CommonsMultipartResolver">
+        <!-- 限制上传大小为 20MB，可按需调整 -->
+        <property name="maxUploadSize" value="20971520"/>
+    </bean>
 
 </beans>
